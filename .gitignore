@@ -1,0 +1,32 @@
+# Node modules
+node_modules/
+
+# Output build files
+.next/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env files
+.env*
+!.env.example
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE configs
+.vscode/
+.idea/
+*.swp
+
+# Vercel metadata (optional – Vercel can regenerate this)
+.vercel/
+
+# Misc
+*.log
+coverage/

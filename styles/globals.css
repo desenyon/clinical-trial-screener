@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Custom styles for form inputs */
+.form-input,
+.form-select,
+.form-textarea {
+  @apply px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 bg-white text-sm;
+}
+
+.form-textarea {
+  @apply resize-y;
+}
