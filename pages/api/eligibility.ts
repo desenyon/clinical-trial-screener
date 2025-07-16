@@ -33,7 +33,7 @@ export default async function handler(
     console.log('Processed input_value:', inputValue);
     
     const response = await fetch(
-      "http://74.225.219.71/api/v1/run/2867785b-6d38-4cd5-9898-7482297069fc",
+      "http://98.70.50.243/api/v1/run/a6875882-1c68-43e4-9761-2479037ae4f6",
       {
         method: "POST",
         headers: {
