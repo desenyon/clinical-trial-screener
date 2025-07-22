@@ -161,40 +161,40 @@ export default function Home() {
             <h3 className="text-xl font-semibold mb-2">Analyzing Patient Data</h3>
             <p className="text-slate-600">AI is checking trial eligibility...</p>
             <p className="text-sm text-slate-500 mt-2">Time elapsed: {loadingTime}s</p>
-            <p className="text-sm text-slate-400">Average wait time: ~150 seconds</p>
+            <p className="text-sm text-slate-400">Average wait time: ~300 seconds</p>
             
-            {/* Progress indicator based on 150 second average */}
+            {/* Progress indicator based on 300 second average */}
             <div className="mt-4">
               <div className="flex justify-between text-xs text-slate-500 mb-1">
                 <span>0s</span>
-                <span>{Math.min(loadingTime, 150)}s / 150s</span>
+                <span>{Math.min(loadingTime, 300)}s / 300s</span>
               </div>
               <div className="bg-slate-200 rounded-full h-3">
                 <div 
                   className={`h-3 rounded-full transition-all duration-1000 ${
-                    loadingTime < 120 ? 'bg-blue-500' : 
-                    loadingTime < 150 ? 'bg-yellow-500' : 
+                    loadingTime < 240 ? 'bg-blue-500' : 
+                    loadingTime < 300 ? 'bg-yellow-500' : 
                     'bg-orange-500'
                   }`}
-                  style={{width: Math.min((loadingTime / 150) * 100, 100) + '%'}}
+                  style={{width: Math.min((loadingTime / 300) * 100, 100) + '%'}}
                 ></div>
               </div>
             </div>
             
             {/* Status messages based on time elapsed */}
-            {loadingTime < 30 && (
+            {loadingTime < 60 && (
               <p className="text-sm text-blue-600 mt-3">🔍 Initializing analysis...</p>
             )}
-            {loadingTime >= 30 && loadingTime < 90 && (
+            {loadingTime >= 60 && loadingTime < 180 && (
               <p className="text-sm text-blue-600 mt-3">⚡ Processing clinical data...</p>
             )}
-            {loadingTime >= 90 && loadingTime < 150 && (
+            {loadingTime >= 180 && loadingTime < 300 && (
               <p className="text-sm text-yellow-600 mt-3">🧠 AI matching trials...</p>
             )}
-            {loadingTime >= 150 && loadingTime < 200 && (
+            {loadingTime >= 300 && loadingTime < 400 && (
               <p className="text-sm text-orange-600 mt-3">⏳ Almost complete...</p>
             )}
-            {loadingTime >= 200 && (
+            {loadingTime >= 400 && (
               <p className="text-sm text-red-600 mt-3">⚠️ Taking longer than expected</p>
             )}
           </div>
