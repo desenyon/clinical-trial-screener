@@ -1,6 +1,17 @@
 // /pages/api/eligibility.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 
+// Increase the timeout for this API route
+export const config = {
+  api: {
+    responseLimit: false,
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+  maxDuration: 300, // 5 minutes max
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log('API Route called with method:', req.method);
 
@@ -27,20 +38,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   console.log('Sending to Langflow...');
 
+  // Create AbortController for timeout handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.log('Request timeout, aborting...');
+    controller.abort();
+  }, 280000); // 280 seconds (20 seconds before Vercel timeout)
+
   try {
     const response = await fetch("http://4.240.113.235:7860/api/v1/run/ecd763a7-feff-4753-b05a-b012a395874e", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": "sk-ev5D6gLGc3IMF1-lZMlhaWsizk3H2LbnIha36bDQS1I",
-        "Connection": "keep-alive",
-        "Accept": "application/json"
+        "Connection": "close", // Changed from keep-alive to close
+        "Accept": "application/json",
+        "User-Agent": "Clinical-Trial-Screener/1.0"
       },
       body: JSON.stringify(requestPayload),
+      signal: controller.signal, // Add abort signal
     });
+
+    clearTimeout(timeoutId); // Clear timeout if request succeeds
 
     const responseText = await response.text();
     console.log('Langflow response status:', response.status);
+    console.log('Response length:', responseText.length);
 
     if (responseText.includes("<!doctype html") || responseText.includes("<html")) {
       return res.status(502).json({
@@ -107,10 +130,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Extracted result:', result);
     return res.status(200).json({ result: String(result) });
   } catch (error) {
+    clearTimeout(timeoutId); // Clear timeout in case of error
+    
     console.error('API Error:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return res.status(504).json({
+          error: "Request timeout - Analysis is taking longer than expected. Please try again.",
+          details: "The AI analysis timed out after 4.5 minutes. This may be due to high server load."
+        });
+      }
+      
+      if ((error as any).code === 'UND_ERR_SOCKET' || error.message?.includes('socket')) {
+        return res.status(503).json({
+          error: "Connection error - Unable to reach the AI analysis service",
+          details: "The connection was closed by the remote server. Please try again in a few moments."
+        });
+      }
+      
+      if (error.message?.includes('fetch failed')) {
+        return res.status(503).json({
+          error: "Network error - Unable to connect to AI service",
+          details: "There may be a temporary network issue. Please try again."
+        });
+      }
+    }
+
     return res.status(500).json({
       error: "Internal server error",
-      details: error instanceof Error ? error.message : "Unknown error",
+      details: error instanceof Error ? error.message : "Unknown error occurred"
     });
   }
 }
