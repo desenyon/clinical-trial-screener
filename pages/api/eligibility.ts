@@ -1,99 +1,116 @@
+// /pages/api/eligibility.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log('API Route called with method:', req.method);
-  console.log('Request body:', req.body);
 
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check if input_value exists
-  if (!req.body?.input_value) {
-    console.error('Missing input_value in request body');
-    return res.status(400).json({ error: 'Missing input_value in request body' });
-  }
+  const inputValue = typeof req.body.input_value === 'string'
+    ? req.body.input_value
+    : JSON.stringify(req.body.input_value);
+
+  console.log('Processing input:', inputValue);
+
+  const requestPayload = {
+    output_type: "text",
+    input_type: "text",
+    tweaks: {
+      "TextInput-xNjgs": {
+        input_value: inputValue
+      }
+    },
+    stream: false
+  };
+  
+  console.log('Sending to Langflow...');
 
   try {
-    console.log('Making request to external API...');
-    
-    // Ensure input_value is a string as the API expects
-    let inputValue;
-    if (typeof req.body.input_value === 'string') {
-      inputValue = req.body.input_value;
-    } else {
-      // If it's an object, stringify it
-      inputValue = JSON.stringify(req.body.input_value);
-    }
-    
-    console.log('Processed input_value:', inputValue);
-    
-    const response = await fetch(
-      "http://98.70.50.243/api/v1/run/a6875882-1c68-43e4-9761-2479037ae4f6",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          input_value: inputValue,
-          input_type: "text",
-          output_type: "text",
-        }),
-      }
-    );
+    const response = await fetch("http://4.240.113.235:7860/api/v1/run/ecd763a7-feff-4753-b05a-b012a395874e", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "sk-ev5D6gLGc3IMF1-lZMlhaWsizk3H2LbnIha36bDQS1I",
+        "Connection": "keep-alive",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(requestPayload),
+    });
 
-    console.log('External API response status:', response.status);
-    console.log('External API response headers:', Object.fromEntries(response.headers.entries()));
-
-    // Get the response text first
     const responseText = await response.text();
-    console.log('External API response text (first 200 chars):', responseText.substring(0, 200));
+    console.log('Langflow response status:', response.status);
 
-    // Check if we got HTML instead of JSON (Langflow web interface)
-    if (responseText.includes('<!doctype html') || responseText.includes('<html')) {
-      console.error('Received HTML response instead of JSON - API endpoint may be incorrect');
-      return res.status(502).json({ 
-        error: 'External API configuration error',
-        details: 'The API endpoint is returning the Langflow web interface instead of JSON. Please check the endpoint configuration.'
+    if (responseText.includes("<!doctype html") || responseText.includes("<html")) {
+      return res.status(502).json({
+        error: "Langflow returned HTML instead of JSON. Check your endpoint or flow config.",
       });
     }
 
-    // Check if the external API returned an error status
     if (!response.ok) {
-      console.error('External API returned error status:', response.status);
-      return res.status(response.status).json({ 
-        error: 'External API error',
-        details: responseText || 'Unknown error from external API'
+      return res.status(response.status).json({
+        error: "External API error",
+        details: responseText,
       });
     }
 
-    // Try to parse the response as JSON
     let jsonResponse;
     try {
       jsonResponse = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse external API response as JSON:', parseError);
-      return res.status(502).json({ 
-        error: 'Invalid JSON response from external API',
-        details: 'The external API returned invalid JSON'
+    } catch {
+      return res.status(502).json({
+        error: "Invalid JSON from Langflow",
       });
     }
 
-    console.log('Successfully parsed external API response:', jsonResponse);
-    
-    // Return the response from the external API
-    return res.status(200).json(jsonResponse);
+    // Log the full response for debugging only if needed
+    // console.log('Full Langflow response:', JSON.stringify(jsonResponse, null, 2));
 
+    // Handle the new response format - check multiple possible paths
+    let result = null;
+    
+    // Try different response structures
+    if (jsonResponse.outputs && jsonResponse.outputs.length > 0) {
+      const firstOutput = jsonResponse.outputs[0];
+      if (firstOutput.outputs && firstOutput.outputs.length > 0) {
+        const nestedOutput = firstOutput.outputs[0];
+        result = nestedOutput.results?.text?.text || 
+                 nestedOutput.results?.text?.data?.text || 
+                 nestedOutput.results?.message?.text ||
+                 nestedOutput.results?.text || 
+                 nestedOutput.message?.text ||
+                 nestedOutput.text ||
+                 nestedOutput.data?.text;
+      }
+    }
+    
+    // Fallback options
+    if (!result) {
+      result = jsonResponse.result || 
+               jsonResponse.message || 
+               jsonResponse.text ||
+               jsonResponse.data?.text;
+    }
+    
+    // If still no result, check if outputs is empty and provide helpful message
+    if (!result) {
+      if (jsonResponse.outputs && jsonResponse.outputs.length === 0) {
+        result = "The Langflow returned an empty response. This might indicate an issue with the flow configuration or the input data format.";
+      } else if (jsonResponse.outputs && jsonResponse.outputs[0]?.outputs?.length === 0) {
+        result = "The Langflow flow completed but produced no output. Please check your flow configuration.";
+      } else {
+        result = `Unexpected response structure: ${JSON.stringify(jsonResponse)}`;
+      }
+    }
+
+    console.log('Extracted result:', result);
+    return res.status(200).json({ result: String(result) });
   } catch (error) {
-    console.error('Error calling external API:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error('API Error:', error);
+    return res.status(500).json({
+      error: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 }
